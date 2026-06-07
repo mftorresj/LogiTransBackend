@@ -12,7 +12,7 @@ class Vehiculo extends Model
 
     protected $fillable = [
         'placa',
-        'tipo',
+        'tipo_vehiculo',
         'capacidad_carga',
         'modelo',
         'marca',
@@ -24,5 +24,5 @@ class Vehiculo extends Model
     ];
 
     public const ESTADOS = ['disponible', 'en_ruta', 'mantenimiento', 'inactivo'];
-    public const TIPOS   = ['camion', 'furgon', 'tractomula', 'camioneta', 'otro'];
+    public const TIPOS   = ['Camion', 'Furgon', 'Tractomula', 'Camioneta', 'Otro'];
 }

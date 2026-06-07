@@ -1,0 +1,8 @@
+ms-auth/vendor/*
+ms-conductores/vendor/*
+ms-rutas/vendor/*
+ms-vehiculos/vendor/*
+ms-viajes/vendor/*
+ms-conductores/composer.json
+ms-auth/composer.json
+

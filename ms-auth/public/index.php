@@ -1,19 +1,40 @@
 <?php
+
+declare(strict_types=1);
+
 use Slim\Factory\AppFactory;
+use Dotenv\Dotenv;
+
 require __DIR__ . '/../vendor/autoload.php';
 
-// Cargar variables de entorno
-$dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/../');
+$dotenv = Dotenv::createImmutable(__DIR__ . '/..');
 $dotenv->load();
 
-// Crear la app Slim
+require __DIR__ . '/../app/Config/Database.php';
+
 $app = AppFactory::create();
 
-// Middleware globales (ejemplo: manejo de errores)
-$app->addErrorMiddleware(true, true, true);
+$app->addBodyParsingMiddleware();
 
-// Registrar rutas
-(require __DIR__ . '/../app/Routes/routes.php')($app);
+$app->addErrorMiddleware(
+    displayErrorDetails: ($_ENV['APP_ENV'] === 'development'),
+    logErrors: true,
+    logErrorDetails: true
+);
 
-// Ejecutar la app
+$app->add(function ($request, $handler) {
+    $response = $handler->handle($request);
+    return $response
+        ->withHeader('Access-Control-Allow-Origin', '*')
+        ->withHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Auth-Token')
+        ->withHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+});
+
+$app->options('/{routes:.+}', function ($request, $response) {
+    return $response->withStatus(200);
+});
+
+require __DIR__ . '/../app/Routes/api.php';
+//(require __DIR__ . '/../app/Routes/api.php')($app);
+
 $app->run();

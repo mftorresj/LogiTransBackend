@@ -20,7 +20,7 @@ class VehiculoController
         }
 
         if (!empty($params['tipo'])) {
-            $query->where('tipo', $params['tipo']);
+            $query->where('tipo_vehiculo', 'like', '%' . $params['tipo'] . '%');
         }
 
         if (!empty($params['placa'])) {
@@ -56,11 +56,17 @@ class VehiculoController
     {
         $body = (array) $request->getParsedBody();
 
+        $tipoVehiculo = trim($body['tipo_vehiculo'] ?? $body['tipo'] ?? '');
+
         $errores = [];
-        foreach (['placa', 'tipo', 'capacidad_carga', 'marca', 'modelo'] as $campo) {
+        foreach (['placa', 'capacidad_carga', 'marca', 'modelo'] as $campo) {
             if (empty($body[$campo]) && $body[$campo] !== '0') {
                 $errores[] = "El campo '{$campo}' es obligatorio.";
             }
+        }
+
+        if ($tipoVehiculo === '') {
+            $errores[] = "El campo 'tipo_vehiculo' es obligatorio.";
         }
 
         if (!empty($errores)) {
@@ -82,13 +88,17 @@ class VehiculoController
             return $this->json($response, false, 'Estado inválido. Use: ' . implode(', ', Vehiculo::ESTADOS), null, 422);
         }
 
+        if (!in_array($tipoVehiculo, Vehiculo::TIPOS)) {
+            return $this->json($response, false, 'Tipo inválido. Use: ' . implode(', ', Vehiculo::TIPOS), null, 422);
+        }
+
         $vehiculo = Vehiculo::create([
-            'placa'          => $placa,
-            'tipo'           => trim($body['tipo']),
-            'capacidad_carga'=> $capacidad,
-            'modelo'         => trim($body['modelo']),
-            'marca'          => trim($body['marca']),
-            'estado'         => $estado,
+            'placa'           => $placa,
+            'tipo_vehiculo'   => $tipoVehiculo,
+            'capacidad_carga' => $capacidad,
+            'modelo'          => trim($body['modelo']),
+            'marca'           => trim($body['marca']),
+            'estado'          => $estado,
         ]);
 
         return $this->json($response, true, 'Vehículo creado correctamente.', $vehiculo, 201);
@@ -120,9 +130,13 @@ class VehiculoController
             return $this->json($response, false, 'Estado inválido.', null, 422);
         }
 
-        $campos = ['placa', 'tipo', 'capacidad_carga', 'modelo', 'marca', 'estado'];
+        if (array_key_exists('tipo_vehiculo', $body) || array_key_exists('tipo', $body)) {
+            $body['tipo_vehiculo'] = trim($body['tipo_vehiculo'] ?? $body['tipo'] ?? '');
+        }
+
+        $campos = ['placa', 'tipo_vehiculo', 'capacidad_carga', 'modelo', 'marca', 'estado'];
         foreach ($campos as $campo) {
-            if (array_key_exists($campo, $body)) {
+            if (array_key_exists($campo, $body)) {                
                 $vehiculo->$campo = is_string($body[$campo]) ? trim($body[$campo]) : $body[$campo];
             }
         }

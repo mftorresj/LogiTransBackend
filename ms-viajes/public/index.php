@@ -13,7 +13,8 @@ $app = AppFactory::create();
 $app->addErrorMiddleware(true, true, true);
 
 // Registrar rutas
-(require __DIR__ . '/../app/Routes/routes.php')($app);
+
+require __DIR__ . '/../app/Routes/api.php';
 
 // Ejecutar la app
 $app->run();

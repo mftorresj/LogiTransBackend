@@ -6,6 +6,7 @@ use App\Controllers\RutaController;
 use App\Controllers\ProgramacionController;
 use App\Middleware\AuthMiddleware;
 
+global $app;
 $app->group('/rutas', function ($group) {
     $group->get('',                 [RutaController::class, 'index']);
     $group->post('',                [RutaController::class, 'store']);
