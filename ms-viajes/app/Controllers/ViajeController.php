@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use App\Models\Viaje;
-use App\Models\Novedad;
+use Carbon\Carbon;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 
@@ -14,22 +14,18 @@ class ViajeController
     public function index(Request $request, Response $response): Response
     {
         $params = $request->getQueryParams();
-        $query  = Viaje::with('novedades');
+        $query  = Viaje::query();
 
         if (!empty($params['estado'])) {
             $query->where('estado', $params['estado']);
         }
 
-        if (!empty($params['conductor_id'])) {
-            $query->where('conductor_id', (int) $params['conductor_id']);
+        if (!empty($params['programacion_viaje_id'])) {
+            $query->where('programacion_viaje_id', (int) $params['programacion_viaje_id']);
         }
 
-        if (!empty($params['vehiculo_id'])) {
-            $query->where('vehiculo_id', (int) $params['vehiculo_id']);
-        }
-
-        if (!empty($params['programacion_id'])) {
-            $query->where('programacion_id', (int) $params['programacion_id']);
+        if (!empty($params['fecha'])) {
+            $query->whereDate('fecha', $params['fecha']);
         }
 
         $viajes = $query->orderBy('created_at', 'desc')->get();
@@ -39,7 +35,7 @@ class ViajeController
 
     public function show(Request $request, Response $response, array $args): Response
     {
-        $viaje = Viaje::with('novedades')->find((int) $args['id']);
+        $viaje = Viaje::find((int) $args['id']);
 
         if (!$viaje) {
             return $this->json($response, false, 'Viaje no encontrado.', null, 404);
@@ -53,7 +49,7 @@ class ViajeController
         $body = (array) $request->getParsedBody();
 
         $errores = [];
-        foreach (['programacion_id', 'conductor_id', 'vehiculo_id', 'ruta_id'] as $campo) {
+        foreach (['programacion_viaje_id', 'fecha', 'hora'] as $campo) {
             if (empty($body[$campo])) {
                 $errores[] = "El campo '{$campo}' es obligatorio.";
             }
@@ -63,21 +59,17 @@ class ViajeController
             return $this->json($response, false, implode(' ', $errores), null, 422);
         }
 
-        $existente = Viaje::where('programacion_id', (int) $body['programacion_id'])
-            ->whereNotIn('estado', ['finalizado', 'cancelado'])
-            ->first();
-
-        if ($existente) {
-            return $this->json($response, false, 'Ya existe un viaje activo para esta programación.', null, 409);
+        $estado = trim($body['estado'] ?? 'programado');
+        if (!in_array($estado, Viaje::ESTADOS, true)) {
+            return $this->json($response, false, 'Estado inválido. Use: ' . implode(', ', Viaje::ESTADOS), null, 422);
         }
 
         $viaje = Viaje::create([
-            'programacion_id' => (int) $body['programacion_id'],
-            'conductor_id'    => (int) $body['conductor_id'],
-            'vehiculo_id'     => (int) $body['vehiculo_id'],
-            'ruta_id'         => (int) $body['ruta_id'],
-            'estado'          => 'programado',
-            'observaciones'   => trim($body['observaciones'] ?? ''),
+            'programacion_viaje_id' => (int) $body['programacion_viaje_id'],
+            'fecha'                 => $body['fecha'],
+            'hora'                  => $body['hora'],
+            'estado'                => $estado,
+            'novedad'               => trim($body['novedad'] ?? ''),
         ]);
 
         return $this->json($response, true, 'Viaje registrado correctamente.', $viaje, 201);
@@ -99,8 +91,9 @@ class ViajeController
             return $this->json($response, false, "El viaje ya está en estado '{$viaje->estado}'. Solo se pueden iniciar viajes programados.", null, 409);
         }
 
-        $viaje->estado       = 'en_transito';
-        $viaje->fecha_inicio = now();
+        $viaje->estado = 'en_transito';
+        $viaje->fecha  = $viaje->fecha ?: Carbon::today()->toDateString();
+        $viaje->hora   = $viaje->hora ?: Carbon::now()->toTimeString();
         $viaje->save();
 
         return $this->json($response, true, 'Viaje iniciado correctamente.', $viaje);
@@ -132,7 +125,8 @@ class ViajeController
         $viaje->estado = $estado;
 
         if ($estado === 'finalizado') {
-            $viaje->fecha_fin = now();
+            $viaje->fecha = $viaje->fecha ?: Carbon::today()->toDateString();
+            $viaje->hora  = $viaje->hora ?: Carbon::now()->toTimeString();
         }
 
         $viaje->save();
@@ -154,9 +148,10 @@ class ViajeController
 
         $body = (array) $request->getParsedBody();
 
-        $viaje->estado       = 'finalizado';
-        $viaje->fecha_fin    = now();
-        $viaje->observaciones = trim($body['observaciones'] ?? $viaje->observaciones ?? '');
+        $viaje->estado = 'finalizado';
+        $viaje->fecha  = $viaje->fecha ?: Carbon::today()->toDateString();
+        $viaje->hora   = $viaje->hora ?: Carbon::now()->toTimeString();
+        $viaje->novedad = trim($body['novedad'] ?? $viaje->novedad ?? '');
         $viaje->save();
 
         return $this->json($response, true, 'Viaje finalizado correctamente.', $viaje);
@@ -181,40 +176,38 @@ class ViajeController
         }
 
         $tipo = $body['tipo'] ?? 'observacion';
-        if (!in_array($tipo, Novedad::TIPOS)) {
-            return $this->json($response, false, 'Tipo inválido. Use: ' . implode(', ', Novedad::TIPOS), null, 422);
-        }
-
-        $novedad = Novedad::create([
-            'viaje_id'       => $viaje->id,
-            'tipo'           => $tipo,
-            'descripcion'    => trim($body['descripcion']),
-            'registrado_por' => trim($body['registrado_por'] ?? 'Sistema'),
-        ]);
+        $descripcion = trim($body['descripcion']);
 
         if ($tipo === 'retraso' && $viaje->estado === 'en_transito') {
             $viaje->estado = 'retrasado';
-            $viaje->save();
         }
 
-        return $this->json($response, true, 'Novedad registrada correctamente.', $novedad, 201);
+        $texto = $descripcion;
+        if (!empty($viaje->novedad)) {
+            $texto = $viaje->novedad . "\n" . $texto;
+        }
+
+        $viaje->novedad = $texto;
+        $viaje->save();
+
+        return $this->json($response, true, 'Novedad registrada correctamente.', $viaje, 201);
     }
 
     public function seguimiento(Request $request, Response $response, array $args): Response
     {
-        $viaje = Viaje::with('novedades')->find((int) $args['id']);
+        $viaje = Viaje::find((int) $args['id']);
 
         if (!$viaje) {
             return $this->json($response, false, 'Viaje no encontrado.', null, 404);
         }
 
         return $this->json($response, true, 'Seguimiento obtenido.', [
-            'viaje'     => $viaje,
-            'novedades' => $viaje->novedades,
-            'resumen'   => [
-                'total_novedades' => $viaje->novedades->count(),
-                'retrasos'        => $viaje->novedades->where('tipo', 'retraso')->count(),
-                'incidentes'      => $viaje->novedades->where('tipo', 'incidente')->count(),
+            'viaje' => $viaje,
+            'novedades' => !empty($viaje->novedad) ? explode("\n", $viaje->novedad) : [],
+            'resumen' => [
+                'total_novedades' => !empty($viaje->novedad) ? 1 : 0,
+                'retrasos' => stripos((string) $viaje->novedad, 'retraso') !== false ? 1 : 0,
+                'incidentes' => stripos((string) $viaje->novedad, 'incidente') !== false ? 1 : 0,
             ],
         ]);
     }

@@ -35,4 +35,3 @@ $app->options('/{routes:.+}', function ($request, $response) {
 require __DIR__ . '/../app/Routes/api.php';
 
 $app->run();
-//Revisar que el código de index.php es igual en ms-vehiculos, ms-conductores y ms-rutas. Solo debe haber diferencias en el namespace de los controladores y rutas.

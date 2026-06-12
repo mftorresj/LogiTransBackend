@@ -8,19 +8,15 @@ use Illuminate\Database\Eloquent\Model;
 
 class Novedad extends Model
 {
-    protected $table = 'novedades';
+    protected $table = 'seguimientos_viajes';
 
     protected $fillable = [
-        'viaje_id',
-        'tipo',
-        'descripcion',
-        'registrado_por',
+        'programacion_viaje_id',
+        'fecha',
+        'hora',
+        'estado',
+        'novedad',
     ];
 
     public const TIPOS = ['retraso', 'incidente', 'observacion', 'cambio_operativo'];
-
-    public function viaje()
-    {
-        return $this->belongsTo(Viaje::class, 'viaje_id');
-    }
 }
