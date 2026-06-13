@@ -44,7 +44,7 @@ class RutaController
         $body = (array) $request->getParsedBody();
         
         $distancia = (float) ($body['distancia'] ?? $body['distancia'] ?? 0);
-        $tiempoEstimado = trim($body['tiempo_estimado'] ?? $body['tiempo_estimado'] ?? '');
+        $tiempoEstimado = trim((string)$body['tiempo_estimado'] ?? (string)$body['tiempo_estimado'] ?? '');
 
         $errores = [];
         foreach (['ciudad_origen', 'ciudad_destino'] as $campo) {
